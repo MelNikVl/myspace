@@ -79,6 +79,7 @@
   .badge.cartoon{color:#ffb3e6;border-color:#4a1c3a;background:#220d1a}
   .badge.docs{color:#d6d6d6;border-color:#3a3a3a;background:#1a1a1a}
   .badge.psy{color:#c9a8ff;border-color:#3a2a4a;background:#1c1226}
+  .badge.fun{color:#ffe066;border-color:#4a4220;background:#221e0d}
   /* таблица фильмов */
   .films-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
   .films-head h2{margin:0;font-size:17px}
@@ -255,6 +256,7 @@
           <option value="путешествия">✈️ Путешествия</option>
           <option value="работа">💼 Работа</option>
           <option value="документы">📄 Документы</option>
+          <option value="приколы">😂 Приколы</option>
           <option value="мультфильм">🧸 Мультфильм</option>
           <option value="фраза">💬 Фраза</option>
           <option value="полезность">🛠 Полезность</option>
@@ -296,10 +298,10 @@ const CATS = [
   ["all","Всё"],["фильм","🎬 Фильмы"],["дизайн","🎨 Дизайн"],["олх","🛒 OLX"],
   ["бизнес","💼 Бизнес"],["книги","📚 Книги"],["психология","🧠 Психология"],["медицина","🏥 Медицина"],
   ["визы","🛂 Визы и переезд"],["путешествия","✈️ Путешествия"],["работа","💼 Работа"],
-  ["документы","📄 Документы"],["фраза","💬 Фразы"],["полезность","🛠 Полезности"],
+  ["документы","📄 Документы"],["приколы","😂 Приколы"],["фраза","💬 Фразы"],["полезность","🛠 Полезности"],
   ["другое","📦 Прочее"]
 ];
-const BADGE = {фильм:"film", сериал:"serial", дизайн:"design", олх:"olx", фраза:"phrase", полезность:"useful", бизнес:"business", книги:"books", психология:"psy", медицина:"med", визы:"visa", путешествия:"travel", работа:"work", мультфильм:"cartoon", документы:"docs"};
+const BADGE = {фильм:"film", сериал:"serial", дизайн:"design", олх:"olx", фраза:"phrase", полезность:"useful", бизнес:"business", книги:"books", психология:"psy", медицина:"med", визы:"visa", путешествия:"travel", работа:"work", мультфильм:"cartoon", документы:"docs", приколы:"fun"};
 const ST_LABEL = {released:"Вышел", ongoing:"Идёт", upcoming:"Скоро", unknown:""};
 let cat = "all", query = "", current = null, rating = 0;
 // поддержка прямых ссылок: #фильм, #олх и т.д.
