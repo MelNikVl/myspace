@@ -6,10 +6,11 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = "/home/nik/shotbox"
 DB = os.path.join(BASE, "data", "shotbox.db")
 PHOTOS = os.path.join(BASE, "photos")
 THUMBS = os.path.join(BASE, "thumbs")
+POSTERS = os.path.join(BASE, "posters")
 
 CATEGORIES = [
     ("all", "Всё"),
@@ -47,6 +48,14 @@ def db():
 @app.get("/thumbs/{name}")
 def thumb(name: str):
     p = os.path.join(THUMBS, os.path.basename(name))
+    if not os.path.exists(p):
+        raise HTTPException(404)
+    return FileResponse(p, media_type="image/jpeg")
+
+
+@app.get("/posters/{name}")
+def poster(name: str):
+    p = os.path.join(POSTERS, os.path.basename(name))
     if not os.path.exists(p):
         raise HTTPException(404)
     return FileResponse(p, media_type="image/jpeg")
@@ -98,7 +107,7 @@ def films():
     """Таблица фильмов: название, рейтинг, год, жанр, описание, смотрел."""
     con = db()
     rows = con.execute(
-        "SELECT id, title, imdb, kp_rating, year, status, genre, text, watched, thumb, rel_path, category "
+        "SELECT id, title, imdb, kp_rating, year, status, genre, text, watched, thumb, rel_path, category, poster "
         "FROM items WHERE category IN ('фильм','сериал','мультфильм') AND dup_of IS NULL "
         "ORDER BY (watched=1), (imdb IS NULL), imdb DESC, (year IS NULL), year DESC"
     ).fetchall()

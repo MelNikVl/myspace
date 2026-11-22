@@ -101,6 +101,11 @@
   .ftable .fwatch{text-align:center}
   .ftable input[type=checkbox]{width:18px;height:18px;accent-color:#2ecc71;cursor:pointer}
   .ftable tr.watched td{opacity:.45}
+  #posterPop{position:fixed;z-index:80;display:none;pointer-events:none;
+    border-radius:10px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.7);
+    border:1px solid #333c4d;background:#000}
+  #posterPop img{display:block;width:180px;height:auto}
+  .fname{position:relative}
   .scans-title{font-size:15px;margin:0 0 12px}
   .empty{color:var(--muted);text-align:center;padding:60px 20px}
   /* modal */
@@ -171,6 +176,8 @@
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none">Ничего не найдено</div>
 </main>
+
+<div id="posterPop"><img id="posterPopImg" src="" alt=""></div>
 
 <div class="modal" id="modal">
   <div class="sheet" style="position:relative">
@@ -314,7 +321,7 @@ function renderFilmsTable(){
     const st = stText(it);
     const desc = (it.text||"").replace(/\s+/g," ").trim();
     return `<tr class="${it.watched?'watched':''}">
-      <td class="fname" onclick='openById(${it.id})'>${esc(it.title||"Без названия")}
+      <td class="fname" data-pid="${it.poster||''}" onclick='openById(${it.id})'>${esc(it.title||"Без названия")}
         ${st?`<span class="st st-${it.status}">${st}</span>`:""}</td>
       <td>${typeBadge(it)}</td>
       <td class="fr">${it.imdb?("★ "+it.imdb):"—"}</td>
@@ -327,6 +334,31 @@ function renderFilmsTable(){
     </tr>`;
   }).join("");
 }
+
+// превью постера при наведении
+(function(){
+  const pop = document.getElementById("posterPop");
+  const img = document.getElementById("posterPopImg");
+  document.addEventListener("mouseover", e=>{
+    const cell = e.target.closest(".fname");
+    if(!cell) return;
+    const id = cell.dataset.pid;
+    if(!id) return;
+    img.src = "/posters/" + id;
+    pop.style.display = "block";
+    const r = cell.getBoundingClientRect();
+    let left = r.right + 14, top = r.top - 30;
+    if(left + 190 > window.innerWidth) left = r.left - 194;
+    if(top + 280 > window.innerHeight) top = window.innerHeight - 290;
+    if(top < 8) top = 8;
+    pop.style.left = left + "px";
+    pop.style.top = top + "px";
+  });
+  document.addEventListener("mouseout", e=>{
+    if(e.target.closest(".fname")) pop.style.display = "none";
+  });
+  window.addEventListener("scroll", ()=>{ pop.style.display = "none"; }, {passive:true});
+})();
 
 async function toggleWatched(id, val){
   await fetch("/api/items/"+id,{method:"POST",headers:{"Content-Type":"application/json"},
