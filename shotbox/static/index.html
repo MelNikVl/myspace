@@ -507,9 +507,7 @@ async function toggleFavorite(id){
 
 async function deleteItem(id){
   const rec = current && current.id === id ? current : null;
-  if(!confirm("Удалить этот скриншот безвозвратно?
-
-Файл будет удалён и с сервера, и с NAS (Synology).")) return;
+  if(!confirm("Удалить этот скриншот безвозвратно?\n\nФайл будет удалён и с сервера, и с NAS (Synology).")) return;
   const r = await fetch(`/api/items/${id}?files=1&nas=1`, {method:"DELETE"});
   if(r.ok){
     closeModal();
