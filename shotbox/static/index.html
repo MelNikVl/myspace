@@ -104,6 +104,16 @@
   .tlink:hover{opacity:1;transform:scale(1.2)}
   .ftable input[type=checkbox]{width:18px;height:18px;accent-color:#2ecc71;cursor:pointer}
   .ftable tr.watched td{opacity:.45}
+  .subtabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+  .stab{background:var(--card);border:1px solid var(--line);color:var(--muted);
+    padding:6px 14px;border-radius:999px;cursor:pointer;font-size:12.5px;transition:.15s}
+  .stab:hover{color:var(--text);border-color:#3a4356}
+  .stab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));
+    border-color:transparent;color:#fff;font-weight:600}
+  .stab .n{opacity:.8;margin-left:5px;font-size:11px}
+  .del-btn{background:transparent;border:1px solid #4a2020;color:#ff7676;border-radius:8px;
+    padding:3px 8px;cursor:pointer;font-size:12px;transition:.15s}
+  .del-btn:hover{background:#4a2020;color:#fff}
   .view-toggle{display:flex;gap:4px;margin-left:auto}
   .vt-btn{background:var(--card);border:1px solid var(--line);color:var(--muted);
     padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12.5px}
@@ -168,6 +178,12 @@
 </div>
 <main>
   <section id="filmsSection" style="display:none">
+    <div class="subtabs" id="filmSubTabs">
+      <div class="stab active" data-sub="all">Все<span class="n" id="subAll">0</span></div>
+      <div class="stab" data-sub="фильм">🎬 Фильмы<span class="n" id="subFilm">0</span></div>
+      <div class="stab" data-sub="сериал">📺 Сериалы<span class="n" id="subSerial">0</span></div>
+      <div class="stab" data-sub="мультфильм">🧸 Мультики<span class="n" id="subCartoon">0</span></div>
+    </div>
     <div class="films-head">
       <h2 id="filmsCount">🎬 Фильмы и сериалы</h2>
       <label><input type="checkbox" id="hideWatched"> скрыть просмотренные</label>
@@ -187,6 +203,7 @@
         <th>Описание</th>
         <th data-sort="watched">Смотрел</th>
         <th>Скачать</th>
+        <th></th>
       </tr></thead>
       <tbody id="filmsBody"></tbody>
     </table>
@@ -305,7 +322,7 @@ async function loadProgress(){
 }
 setInterval(loadProgress, 15000);
 
-let filmsData = [], filmsSort = {key:"imdb", dir:-1}, filmsView = "table";
+let filmsData = [], filmsSort = {key:"imdb", dir:-1}, filmsView = "table", filmSub = "all";
 
 function typeBadge(it){
   const map = { "фильм":["🎬 Фильм","film"], "сериал":["📺 Сериал","serial"],
@@ -331,7 +348,7 @@ function stText(it){
 }
 
 async function loadFilmsTable(){
-  const d = await (await fetch("/api/films")).json();
+  const d = await (await fetch("/api/films?subtype=" + encodeURIComponent(filmSub))).json();
   filmsData = d.items || [];
   renderFilmsTable();
 }
@@ -386,6 +403,7 @@ function renderFilmsTable(){
       <td class="fwatch"><input type="checkbox" ${it.watched?"checked":""}
           onchange="toggleWatched(${it.id}, this.checked)"></td>
       <td class="ftorr">${torrentLinks(it)}</td>
+      <td><button class="del-btn" title="Удалить фильм и скрин" onclick="event.stopPropagation();deleteFilm(${it.id})">🗑</button></td>
     </tr>`;
   }).join("");
 }
@@ -415,6 +433,21 @@ function renderFilmsTable(){
   window.addEventListener("scroll", ()=>{ pop.style.display = "none"; }, {passive:true});
 })();
 
+async function deleteFilm(id){
+  const rec = filmsData.find(x=>x.id===id);
+  const title = rec ? rec.title : "";
+  if(!confirm(`Удалить «${title||"фильм"}» вместе со скрином?
+
+Файл скриншота будет удалён безвозвратно.`)) return;
+  const r = await fetch(`/api/items/${id}?files=1`, {method:"DELETE"});
+  if(r.ok){
+    filmsData = filmsData.filter(x=>x.id!==id);
+    renderFilmsTable(); loadStats();
+  } else {
+    alert("Не удалось удалить");
+  }
+}
+
 async function toggleWatched(id, val){
   await fetch("/api/items/"+id,{method:"POST",headers:{"Content-Type":"application/json"},
     body: JSON.stringify({watched: val?1:0})});
@@ -442,6 +475,13 @@ document.addEventListener("change", e=>{
   if(e.target.id==="hideWatched") renderFilmsTable();
 });
 document.addEventListener("click", e=>{
+  const sb = e.target.closest(".stab");
+  if(sb){
+    filmSub = sb.dataset.sub;
+    document.querySelectorAll(".stab").forEach(x=>x.classList.toggle("active", x===sb));
+    loadFilmsTable();
+    return;
+  }
   const b = e.target.closest(".vt-btn");
   if(!b) return;
   filmsView = b.dataset.view;
@@ -453,6 +493,16 @@ async function loadStats(){
   const s = await (await fetch("/api/stats")).json();
   document.getElementById("stat").textContent =
     `${s.total} скриншотов · распознано ${s.analyzed}`;
+  // счётчики подтипов для фильмов
+  const c = s.categories || {};
+  const el = id => document.getElementById(id);
+  if(el("subFilm")){
+    el("subFilm").textContent = c["фильм"]||0;
+    el("subSerial").textContent = c["сериал"]||0;
+    el("subCartoon").textContent = c["мультфильм"]||0;
+    el("subAll").textContent = (c["фильм"]||0)+(c["сериал"]||0)+(c["мультфильм"]||0);
+  }
+
   const tabs = document.getElementById("tabs");
   tabs.innerHTML = CATS.map(([k,label])=>{
     const known = CATS.filter(([c])=>c!=="all"&&c!=="другое")

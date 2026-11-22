@@ -103,16 +103,57 @@ def items(category: str = "all", q: str = "", limit: int = 500, offset: int = 0,
 
 
 @app.get("/api/films")
-def films():
-    """Таблица фильмов: название, рейтинг, год, жанр, описание, смотрел."""
+def films(subtype: str = "all"):
+    """Таблица фильмов. Дедуп по названию, опционально по подтипу."""
     con = db()
-    rows = con.execute(
-        "SELECT id, title, imdb, kp_rating, year, status, genre, text, watched, thumb, rel_path, category, poster "
-        "FROM items WHERE category IN ('фильм','сериал','мультфильм') AND dup_of IS NULL "
-        "ORDER BY (watched=1), (imdb IS NULL), imdb DESC, (year IS NULL), year DESC"
-    ).fetchall()
+    where = ["category IN ('фильм','сериал','мультфильм')", "dup_of IS NULL"]
+    if subtype in ("фильм", "сериал", "мультфильм"):
+        where.append(f"category = '{subtype}'")
+    sql = """SELECT MIN(id) AS id, title, imdb, kp_rating, year, status, genre, text,
+                    MAX(watched) AS watched, thumb, rel_path, category, poster,
+                    COUNT(*) AS copies
+             FROM items
+             WHERE {w}
+             GROUP BY LOWER(TRIM(COALESCE(NULLIF(title,''), 'id'||id)))
+             ORDER BY (MAX(watched)=1), (imdb IS NULL), imdb DESC, (year IS NULL), year DESC
+          """.format(w=" AND ".join(where))
+    rows = [dict(r) for r in con.execute(sql)]
     con.close()
-    return {"items": [dict(r) for r in rows]}
+    return {"items": rows}
+
+
+@app.delete("/api/items/{item_id}")
+def delete_item(item_id: int, files: int = 1):
+    """Удалить запись + файлы скрина/миниатюры/постера."""
+    con = db()
+    row = con.execute("SELECT rel_path, thumb, poster, content_hash FROM items WHERE id=?",
+                      (item_id,)).fetchone()
+    if not row:
+        raise HTTPException(404)
+    deleted = []
+    if files:
+        # удаляем все копии (тот же content_hash), включая файлы
+        dup_rows = con.execute(
+            "SELECT id, rel_path, thumb, poster FROM items WHERE content_hash=? OR id=?",
+            (row["content_hash"], item_id)).fetchall()
+        for d in dup_rows:
+            for field, root in (("rel_path", PHOTOS), ("thumb", THUMBS), ("poster", POSTERS)):
+                val = d[field]
+                if not val:
+                    continue
+                path = os.path.realpath(os.path.join(root, val))
+                if path.startswith(os.path.realpath(root)) and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                        deleted.append(os.path.basename(path))
+                    except Exception:
+                        pass
+            con.execute("DELETE FROM items WHERE id=?", (d["id"],))
+    else:
+        con.execute("DELETE FROM items WHERE id=?", (item_id,))
+    con.commit()
+    con.close()
+    return {"ok": True, "deleted_files": len(deleted)}
 
 
 @app.get("/api/progress")
