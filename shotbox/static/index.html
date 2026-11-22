@@ -99,8 +99,23 @@
   .ftable .fyear{color:var(--muted);white-space:nowrap}
   .ftable .fgenre{color:#9aa3b2;font-size:12px;max-width:130px}
   .ftable .fwatch{text-align:center}
+  .ftable .ftorr{text-align:center;white-space:nowrap}
+  .tlink{text-decoration:none;font-size:17px;opacity:.75;transition:.15s;display:inline-block;padding:2px 4px}
+  .tlink:hover{opacity:1;transform:scale(1.2)}
   .ftable input[type=checkbox]{width:18px;height:18px;accent-color:#2ecc71;cursor:pointer}
   .ftable tr.watched td{opacity:.45}
+  .view-toggle{display:flex;gap:4px;margin-left:auto}
+  .vt-btn{background:var(--card);border:1px solid var(--line);color:var(--muted);
+    padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12.5px}
+  .vt-btn.active{background:var(--card2);color:var(--text);border-color:#3a4356}
+  .fposters{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:22px}
+  .fposter{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+    cursor:pointer;transition:.18s;display:flex;flex-direction:column}
+  .fposter:hover{transform:translateY(-3px);border-color:#3a4356}
+  .fposter img{width:100%;aspect-ratio:2/3;object-fit:cover;background:#0a0c10;display:block}
+  .fposter .pb{padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+  .fposter .pn{font-size:12.5px;font-weight:600;line-height:1.3;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   #posterPop{position:fixed;z-index:80;display:none;pointer-events:none;
     border-radius:10px;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.7);
     border:1px solid #333c4d;background:#000}
@@ -156,6 +171,10 @@
     <div class="films-head">
       <h2 id="filmsCount">🎬 Фильмы и сериалы</h2>
       <label><input type="checkbox" id="hideWatched"> скрыть просмотренные</label>
+      <div class="view-toggle">
+        <button class="vt-btn active" data-view="table">▤ Таблица</button>
+        <button class="vt-btn" data-view="posters">▦ Плитка</button>
+      </div>
     </div>
     <table class="ftable">
       <thead><tr>
@@ -167,9 +186,11 @@
         <th data-sort="genre">Жанр</th>
         <th>Описание</th>
         <th data-sort="watched">Смотрел</th>
+        <th>Скачать</th>
       </tr></thead>
       <tbody id="filmsBody"></tbody>
     </table>
+    <div class="fposters" id="filmsPosters" style="display:none"></div>
     <div class="empty" id="filmsEmpty" style="display:none">Пока нет распознанных фильмов</div>
     <h3 class="scans-title">Скрины</h3>
   </section>
@@ -183,6 +204,7 @@
   <div class="sheet" style="position:relative">
     <button class="close" onclick="closeModal()">×</button>
     <div class="imgwrap"><img id="mImg" src=""></div>
+    <img id="mPoster" src="" style="display:none;width:200px;object-fit:contain;align-self:flex-start;margin:20px 0 0">
     <div class="side">
       <h3 id="mTitle">—</h3>
       <div class="stat" id="mMeta"></div>
@@ -283,13 +305,24 @@ async function loadProgress(){
 }
 setInterval(loadProgress, 15000);
 
-let filmsData = [], filmsSort = {key:"imdb", dir:-1};
+let filmsData = [], filmsSort = {key:"imdb", dir:-1}, filmsView = "table";
 
 function typeBadge(it){
   const map = { "фильм":["🎬 Фильм","film"], "сериал":["📺 Сериал","serial"],
                 "мультфильм":["🧸 Мультик","cartoon"] };
   const [label, cls] = map[it.category] || ["🎬 Фильм","film"];
   return `<span class="badge ${cls}" style="white-space:nowrap">${label}</span>`;
+}
+
+function cleanTitle(t){
+  return (t||"").replace(/[«»"']/g,"").replace(/\s+/g," ").trim();
+}
+function torrentLinks(it){
+  const q = cleanTitle(it.title);
+  if(!q) return "—";
+  const e = encodeURIComponent(q);
+  return `<a class="tlink" target="_blank" rel="noopener" title="Скачать с RuTracker"
+            href="https://rutracker.org/forum/tracker.php?nm=${e}">🧲</a>`;
 }
 
 function stText(it){
@@ -317,6 +350,27 @@ function renderFilmsTable(){
   document.getElementById("filmsCount").textContent =
     `🎬 Фильмы и сериалы (${items.length})`;
   document.getElementById("filmsEmpty").style.display = items.length ? "none" : "block";
+  // плиточный режим
+  const pv = document.getElementById("filmsPosters");
+  const tbl = document.querySelector(".ftable");
+  if(filmsView === "posters"){
+    pv.style.display = "grid";
+    tbl.style.display = "none";
+    pv.innerHTML = items.filter(i=>i.poster).map(it=>`
+      <div class="fposter" onclick='openById(${it.id})'>
+        <img loading="lazy" src="/posters/${it.poster}" alt="">
+        <div class="pb">
+          <div class="pn">${esc(it.title||"Без названия")}</div>
+          <div class="fmeta">${it.imdb?`<span class="imdb">★ ${it.imdb}</span>`:""}${it.year?`<span>${it.year}</span>`:""}
+            <a class="tlink" style="margin-left:auto" target="_blank" rel="noopener" title="Скачать"
+               href="https://rutracker.org/forum/tracker.php?nm=${encodeURIComponent(cleanTitle(it.title))}">🧲</a></div>
+        </div>
+      </div>`).join("") || `<div class="empty">Нет постеров</div>`;
+  } else {
+    pv.style.display = "none";
+    tbl.style.display = "";
+  }
+
   document.getElementById("filmsBody").innerHTML = items.map(it=>{
     const st = stText(it);
     const desc = (it.text||"").replace(/\s+/g," ").trim();
@@ -331,6 +385,7 @@ function renderFilmsTable(){
       <td class="fdesc">${esc(desc.slice(0,160))}${desc.length>160?"…":""}</td>
       <td class="fwatch"><input type="checkbox" ${it.watched?"checked":""}
           onchange="toggleWatched(${it.id}, this.checked)"></td>
+      <td class="ftorr">${torrentLinks(it)}</td>
     </tr>`;
   }).join("");
 }
@@ -386,6 +441,13 @@ document.addEventListener("click", e=>{
 document.addEventListener("change", e=>{
   if(e.target.id==="hideWatched") renderFilmsTable();
 });
+document.addEventListener("click", e=>{
+  const b = e.target.closest(".vt-btn");
+  if(!b) return;
+  filmsView = b.dataset.view;
+  document.querySelectorAll(".vt-btn").forEach(x=>x.classList.toggle("active", x===b));
+  renderFilmsTable();
+});
 
 async function loadStats(){
   const s = await (await fetch("/api/stats")).json();
@@ -440,6 +502,10 @@ function openItem(it){
   document.getElementById("mReview").value = it.review||"";
   document.getElementById("mOrig").href = "/photos/" + it.rel_path;
 
+  const mp = document.getElementById("mPoster");
+  if(it.poster){ mp.src = "/posters/" + it.poster; mp.style.display = "block"; }
+  else { mp.style.display = "none"; }
+
   const mf = document.getElementById("mFilm");
   if(["фильм","сериал","мультфильм"].includes(it.category)){
     const bits = [];
@@ -450,7 +516,11 @@ function openItem(it){
     const st = stBadge(it.status);
     if(st) bits.push(st);
     const q = encodeURIComponent(it.title || it.text || "");
-    bits.push(`<a class="link" target="_blank" href="https://www.kinopoisk.ru/index.php?kp_query=${q}">Кинопоиск ↗</a>`);
+    const tq = encodeURIComponent(cleanTitle(it.title));
+    bits.push(`<a class="link" target="_blank" rel="noopener" href="https://rutracker.org/forum/tracker.php?nm=${tq}">🧲 RuTracker</a>`);
+    bits.push(`<a class="link" target="_blank" rel="noopener" href="https://nnmclub.to/forum/tracker.php?nm=${tq}">🧲 NNM-Club</a>`);
+    if(it.kp_id) bits.push(`<a class="link" target="_blank" href="https://www.kinopoisk.ru/film/${it.kp_id}/">🎬 Кинопоиск ↗</a>`);
+    else bits.push(`<a class="link" target="_blank" href="https://www.kinopoisk.ru/index.php?kp_query=${q}">Кинопоиск ↗</a>`);
     mf.innerHTML = `<div class="fmeta">${bits.join("")}</div>`;
     mf.style.display = "block";
   } else {
