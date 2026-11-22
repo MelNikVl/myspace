@@ -155,6 +155,7 @@
     <table class="ftable">
       <thead><tr>
         <th data-sort="title">Название</th>
+        <th data-sort="category">Тип</th>
         <th data-sort="imdb">★ IMDb</th>
         <th data-sort="kp_rating">КП</th>
         <th data-sort="year">Год</th>
@@ -277,6 +278,13 @@ setInterval(loadProgress, 15000);
 
 let filmsData = [], filmsSort = {key:"imdb", dir:-1};
 
+function typeBadge(it){
+  const map = { "фильм":["🎬 Фильм","film"], "сериал":["📺 Сериал","serial"],
+                "мультфильм":["🧸 Мультик","cartoon"] };
+  const [label, cls] = map[it.category] || ["🎬 Фильм","film"];
+  return `<span class="badge ${cls}" style="white-space:nowrap">${label}</span>`;
+}
+
 function stText(it){
   const st = {released:"Вышел", ongoing:"Идёт", upcoming:"Скоро"}[it.status] || "";
   return st;
@@ -294,7 +302,7 @@ function renderFilmsTable(){
   const {key, dir} = filmsSort;
   items = items.slice().sort((a,b)=>{
     let x = a[key], y = b[key];
-    if(key==="title"||key==="genre"){ x=(x||"").toLowerCase(); y=(y||"").toLowerCase(); return x>y?dir:x<y?-dir:0; }
+    if(key==="title"||key==="genre"||key==="category"){ x=(x||"").toLowerCase(); y=(y||"").toLowerCase(); return x>y?dir:x<y?-dir:0; }
     x = (x===null||x===undefined) ? (dir>0?-1:99999) : Number(x);
     y = (y===null||y===undefined) ? (dir>0?-1:99999) : Number(y);
     return (x-y)*dir;
@@ -308,6 +316,7 @@ function renderFilmsTable(){
     return `<tr class="${it.watched?'watched':''}">
       <td class="fname" onclick='openById(${it.id})'>${esc(it.title||"Без названия")}
         ${st?`<span class="st st-${it.status}">${st}</span>`:""}</td>
+      <td>${typeBadge(it)}</td>
       <td class="fr">${it.imdb?("★ "+it.imdb):"—"}</td>
       <td class="fr" style="color:#ff9e4a">${it.kp_rating?it.kp_rating:"—"}</td>
       <td class="fyear">${it.year||"—"}</td>

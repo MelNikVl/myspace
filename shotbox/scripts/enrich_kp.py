@@ -9,8 +9,8 @@ import urllib.parse
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-KEY = os.environ["KP_KEY"]
-DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "shotbox.db")
+KEY = os.environ.get("KP_KEY", "7477ebc7-262b-4ce0-b145-0330de4a6d07")
+DB = "/home/nik/shotbox/data/shotbox.db"
 BASE = "https://kinopoiskapiunofficial.tech"
 HDRS = {"X-API-KEY": KEY, "Content-Type": "application/json"}
 
@@ -114,6 +114,17 @@ for it in rows:
     desc = (details.get("shortDescription") or details.get("description")
             or film.get("description") or "")
     desc = re.sub(r"<[^>]+>", "", desc)[:400]
+    # подтип: мультфильм / сериал / фильм — по данным Кинопоиска
+    kp_type = (details.get("type") or film.get("type") or "").upper()
+    genres_low = genre.lower()
+    if ("мультфильм" in genres_low or "аниме" in genres_low
+            or kp_type in ("CARTOON", "ANIMATED_SERIES")):
+        subtype = "мультфильм"
+    elif kp_type in ("TV_SERIES", "TV_SHOW", "MINI_SERIES", "TV_SERIES_AND_FILM"):
+        subtype = "сериал"
+    else:
+        subtype = "фильм"
+
     pstatus = (details.get("productionStatus") or "").upper()
 
     if pstatus in ("FILMING", "PRE_PRODUCTION", "POST_PRODUCTION"):
@@ -126,8 +137,8 @@ for it in rows:
     con.execute(
         "UPDATE items SET title=?, year=?, imdb=?, kp_rating=?, genre=?, "
         "status=?, text=CASE WHEN ? != '' THEN ? ELSE text END, "
-        "kp_id=?, enriched=1 WHERE id=?",
-        (name_ru[:120], year, imdb, kp, genre, status, desc, desc, fid, it["id"]),
+        "category=?, kp_id=?, enriched=1 WHERE id=?",
+        (name_ru[:120], year, imdb, kp, genre, status, desc, desc, subtype, fid, it["id"]),
     )
     con.commit()
     ok += 1
