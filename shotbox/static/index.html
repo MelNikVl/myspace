@@ -111,6 +111,18 @@
   .stab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));
     border-color:transparent;color:#fff;font-weight:600}
   .stab .n{opacity:.8;margin-left:5px;font-size:11px}
+  .fposter{position:relative}
+  .pact{position:absolute;top:6px;right:6px;display:flex;gap:4px;opacity:0;transition:.15s;z-index:2}
+  .fposter:hover .pact{opacity:1}
+  .pact button{background:rgba(10,12,16,.85);border:1px solid #3a4356;color:#e8eaed;
+    border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer;display:flex;
+    align-items:center;justify-content:center;padding:0}
+  .pact button:hover{background:#2b3240}
+  .pact .fav.on{color:#ffcc4d;border-color:#4a3c1c}
+  .pact .del:hover{background:#4a2020;color:#fff;border-color:#6a2a2a}
+  .fav-btn{background:transparent;border:1px solid var(--line);color:var(--muted);
+    border-radius:8px;padding:3px 8px;cursor:pointer;font-size:15px;transition:.15s;line-height:1}
+  .fav-btn.on{color:#ffcc4d;border-color:#4a3c1c;background:#221c0d}
   .del-btn{background:transparent;border:1px solid #4a2020;color:#ff7676;border-radius:8px;
     padding:3px 8px;cursor:pointer;font-size:12px;transition:.15s}
   .del-btn:hover{background:#4a2020;color:#fff}
@@ -183,6 +195,7 @@
       <div class="stab" data-sub="фильм">🎬 Фильмы<span class="n" id="subFilm">0</span></div>
       <div class="stab" data-sub="сериал">📺 Сериалы<span class="n" id="subSerial">0</span></div>
       <div class="stab" data-sub="мультфильм">🧸 Мультики<span class="n" id="subCartoon">0</span></div>
+      <div class="stab" data-sub="favorite">⭐ Избранное<span class="n" id="subFav">0</span></div>
     </div>
     <div class="films-head">
       <h2 id="filmsCount">🎬 Фильмы и сериалы</h2>
@@ -201,6 +214,7 @@
         <th data-sort="year">Год</th>
         <th data-sort="genre">Жанр</th>
         <th>Описание</th>
+        <th>★</th>
         <th data-sort="watched">Смотрел</th>
         <th>Скачать</th>
         <th></th>
@@ -267,8 +281,10 @@
           <span class="star" data-v="5">★</span>
         </div>
       </div>
-      <div class="row">
+      <div class="row" style="flex-wrap:wrap">
         <button class="btn" onclick="saveItem()">Сохранить</button>
+        <button class="btn ghost" id="mFavBtn" onclick="favFromModal()" title="В избранное">☆ В избранное</button>
+        <button class="btn ghost" onclick="refreshKp()" title="Перезапросить рейтинг/год/тип по названию">🔄 Кинопоиск</button>
         <a class="link" id="mOrig" target="_blank" style="align-self:center">Открыть оригинал ↗</a>
       </div>
     </div>
@@ -375,6 +391,11 @@ function renderFilmsTable(){
     tbl.style.display = "none";
     pv.innerHTML = items.filter(i=>i.poster).map(it=>`
       <div class="fposter" onclick='openById(${it.id})'>
+        <div class="pact">
+          <button class="fav ${it.favorite?'on':''}" title="В избранное"
+            onclick="event.stopPropagation();toggleFavorite(${it.id})">${it.favorite?"★":"☆"}</button>
+          <button class="del" title="Удалить" onclick="event.stopPropagation();deleteFilm(${it.id})">🗑</button>
+        </div>
         <img loading="lazy" src="/posters/${it.poster}" alt="">
         <div class="pb">
           <div class="pn">${esc(it.title||"Без названия")}</div>
@@ -400,6 +421,8 @@ function renderFilmsTable(){
       <td class="fyear">${it.year||"—"}</td>
       <td class="fgenre">${esc(it.genre||"—")}</td>
       <td class="fdesc">${esc(desc.slice(0,160))}${desc.length>160?"…":""}</td>
+      <td style="text-align:center"><button class="fav-btn ${it.favorite?'on':''}" title="В избранное"
+          onclick="event.stopPropagation();toggleFavorite(${it.id})">${it.favorite?"★":"☆"}</button></td>
       <td class="fwatch"><input type="checkbox" ${it.watched?"checked":""}
           onchange="toggleWatched(${it.id}, this.checked)"></td>
       <td class="ftorr">${torrentLinks(it)}</td>
@@ -432,6 +455,15 @@ function renderFilmsTable(){
   });
   window.addEventListener("scroll", ()=>{ pop.style.display = "none"; }, {passive:true});
 })();
+
+async function toggleFavorite(id){
+  const rec = filmsData.find(x=>x.id===id);
+  const val = rec && rec.favorite ? 0 : 1;
+  await fetch(`/api/items/${id}`, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({favorite: val})});
+  if(rec) rec.favorite = val;
+  renderFilmsTable(); loadStats();
+}
 
 async function deleteFilm(id){
   const rec = filmsData.find(x=>x.id===id);
@@ -501,6 +533,7 @@ async function loadStats(){
     el("subSerial").textContent = c["сериал"]||0;
     el("subCartoon").textContent = c["мультфильм"]||0;
     el("subAll").textContent = (c["фильм"]||0)+(c["сериал"]||0)+(c["мультфильм"]||0);
+    if(el("subFav")) el("subFav").textContent = s.favorites || 0;
   }
 
   const tabs = document.getElementById("tabs");
@@ -577,7 +610,7 @@ function openItem(it){
     mf.style.display = "none";
   }
 
-  paintStars();
+  paintStars(); paintFavBtn();
   document.getElementById("modal").classList.add("open");
 }
 function paintStars(){
@@ -590,6 +623,50 @@ document.getElementById("mStars").onclick = e=>{
 };
 function closeModal(){document.getElementById("modal").classList.remove("open");}
 document.getElementById("modal").onclick = e=>{ if(e.target.id==="modal") closeModal(); };
+
+async function favFromModal(){
+  if(!current) return;
+  const val = current.favorite ? 0 : 1;
+  await fetch(`/api/items/${current.id}`, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({favorite: val})});
+  current.favorite = val;
+  paintFavBtn();
+  loadFilmsTable();
+}
+
+function paintFavBtn(){
+  const b = document.getElementById("mFavBtn");
+  if(!b || !current) return;
+  b.textContent = current.favorite ? "★ В избранном" : "☆ В избранное";
+  b.style.color = current.favorite ? "#ffcc4d" : "";
+}
+
+async function refreshKp(){
+  if(!current) return;
+  const title = document.getElementById("mName").value.trim() || current.title || "";
+  if(!title) return alert("Сначала укажите название");
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = "⏳ ищу…";
+  try{
+    const r = await fetch(`/api/items/${current.id}/refresh-kp`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({title})
+    });
+    const d = await r.json();
+    if(d.ok){
+      alert(`✅ Найдено: ${d.title}
+Тип: ${d.type} | ${d.year} | IMDb ${d.imdb||"—"} | КП ${d.kp||"—"}
+Совпадение: ${Math.round(d.score*100)}%`);
+      closeModal(); loadStats(); loadFilmsTable(); load();
+    } else {
+      alert("Не найдено: " + (d.reason||"нет совпадений"));
+    }
+  }catch(e){
+    alert("Ошибка запроса");
+  }finally{
+    btn.disabled = false; btn.textContent = "🔄 Кинопоиск";
+  }
+}
 
 async function saveItem(){
   if(!current) return;

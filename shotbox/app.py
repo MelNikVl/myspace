@@ -1,6 +1,7 @@
 """ShotBox — галерея-органайзер скриншотов (FastAPI + SQLite)."""
 import os
 import sqlite3
+import sys
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -37,6 +38,8 @@ KNOWN = ("('фильм','сериал','мультфильм','дизайн','о
          "'книги','психология','медицина','визы','путешествия','работа','документы')")
 
 app = FastAPI(title="ShotBox")
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def db():
@@ -107,15 +110,17 @@ def films(subtype: str = "all"):
     """Таблица фильмов. Дедуп по названию, опционально по подтипу."""
     con = db()
     where = ["category IN ('фильм','сериал','мультфильм')", "dup_of IS NULL"]
-    if subtype in ("фильм", "сериал", "мультфильм"):
+    if subtype == "favorite":
+        where.append("favorite = 1")
+    elif subtype in ("фильм", "сериал", "мультфильм"):
         where.append(f"category = '{subtype}'")
     sql = """SELECT MIN(id) AS id, title, imdb, kp_rating, year, status, genre, text,
-                    MAX(watched) AS watched, thumb, rel_path, category, poster,
+                    MAX(watched) AS watched, MAX(favorite) AS favorite, thumb, rel_path, category, poster,
                     COUNT(*) AS copies
              FROM items
              WHERE {w}
              GROUP BY LOWER(TRIM(COALESCE(NULLIF(title,''), 'id'||id)))
-             ORDER BY (MAX(watched)=1), (imdb IS NULL), imdb DESC, (year IS NULL), year DESC
+             ORDER BY (MAX(favorite)=1) DESC, (MAX(watched)=1), (imdb IS NULL), imdb DESC, (year IS NULL), year DESC
           """.format(w=" AND ".join(where))
     rows = [dict(r) for r in con.execute(sql)]
     con.close()
@@ -156,6 +161,34 @@ def delete_item(item_id: int, files: int = 1):
     return {"ok": True, "deleted_files": len(deleted)}
 
 
+@app.post("/api/items/{item_id}/refresh-kp")
+async def refresh_kp(item_id: int, request: Request):
+    """Перепарсить метаданные фильма по текущему (или переданному) названию."""
+    from kp_lookup import apply_to_item
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    con = db()
+    row = con.execute("SELECT title, year FROM items WHERE id=?", (item_id,)).fetchone()
+    if not row:
+        con.close()
+        raise HTTPException(404)
+    title = (body.get("title") or row["title"] or "").strip()
+    year = body.get("year") or row["year"]
+    if not title:
+        con.close()
+        raise HTTPException(400, "пустое название")
+    try:
+        res = apply_to_item(con, item_id, title, year)
+    except Exception as e:
+        con.close()
+        raise HTTPException(500, f"ошибка Кинопоиска: {type(e).__name__}")
+    con.close()
+    return res
+
+
 @app.get("/api/progress")
 def progress():
     con = db()
@@ -177,11 +210,12 @@ def stats():
     rows = con.execute("SELECT category, COUNT(*) c FROM items GROUP BY category").fetchall()
     total = con.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     analyzed = con.execute("SELECT COUNT(*) FROM items WHERE analyzed=1").fetchone()[0]
+    favs = con.execute("SELECT COUNT(*) FROM items WHERE favorite=1").fetchone()[0]
     con.close()
     cats = {r["category"]: r["c"] for r in rows}
     # фильмы/сериалы/мультфильмы объединены в одну группу
     cats["фильм"] = sum(cats.get(k, 0) for k in FILM_GROUP)
-    return {"total": total, "analyzed": analyzed, "categories": cats}
+    return {"total": total, "analyzed": analyzed, "favorites": favs, "categories": cats}
 
 
 @app.post("/api/items/{item_id}")
@@ -189,7 +223,7 @@ async def update_item(item_id: int, request: Request):
     body = await request.json()
     con = db()
     fields, params = [], []
-    for key in ("category", "title", "text", "review", "rating", "url", "watched"):
+    for key in ("category", "title", "text", "review", "rating", "url", "watched", "favorite"):
         if key in body:
             fields.append(f"{key} = ?")
             params.append(body[key])

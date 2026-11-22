@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 KEY = os.environ["GEMINI_KEY"]
 MODELS = ["gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-2.5-flash"]
 MODEL = MODELS[0]
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE = "/home/nik/shotbox"
 DB = os.path.join(BASE, "data", "shotbox.db")
 PHOTOS = os.path.join(BASE, "photos")
 PAUSE = 13
@@ -24,6 +24,10 @@ PROMPT = """Ты помогаешь разобрать личные скринш
 
 Правила категорий:
 - фильм: упоминание/кадр фильма, «что за фильм», трейлер, постер
+  ВАЖНО для фильмов/сериалов: название бери из ПОДПИСИ или ТЕКСТА ПОСТА,
+  а НЕ с рекламного постера/баннера в ленте. Если в подписи написано
+  «Крушение мира (2025)» — название «Крушение мира», даже если рядом
+  в ленте виден другой постер.
 - сериал: сериал, сезон, эпизод, «топ сериалов»
 - мультфильм: мультфильм, аниме, мультсериал, Disney/Pixar, «мультик»
 - дизайн: визуальный референс — интерьер, логотип, UI, мода, реклама, красивая вёрстка, обои
