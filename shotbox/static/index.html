@@ -50,7 +50,7 @@
   .st-unknown{color:var(--muted);border-color:var(--line);background:var(--card2)}
   main{padding:20px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  .card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;
         overflow:hidden;cursor:pointer;transition:.18s;display:flex;flex-direction:column}
   .card:hover{transform:translateY(-3px);border-color:#3a4356;
               box-shadow:0 10px 26px rgba(0,0,0,.45)}
@@ -112,6 +112,16 @@
   .stab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));
     border-color:transparent;color:#fff;font-weight:600}
   .stab .n{opacity:.8;margin-left:5px;font-size:11px}
+  .card .cact{position:absolute;top:6px;right:6px;z-index:3;display:flex;gap:4px;opacity:0;transition:.15s}
+  .card:hover .cact{opacity:1}
+  .cact button{background:rgba(10,12,16,.85);border:1px solid #3a4356;color:#e8eaed;border-radius:8px;
+    width:28px;height:28px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+  .cact button:hover{background:#2b3240}
+  .cact .del:hover{background:#4a2020;border-color:#6a2a2a;color:#fff}
+  .icon-btn{background:var(--card);border:1px solid var(--line);color:var(--muted);border-radius:10px;
+    padding:8px 12px;cursor:pointer;font-size:15px;transition:.15s}
+  .icon-btn:hover{color:var(--text);border-color:#3a4356}
+  .set-row{display:flex;gap:10px;margin-top:6px}
   .fposter{position:relative}
   .pact{position:absolute;top:6px;right:6px;display:flex;gap:4px;opacity:0;transition:.15s;z-index:2}
   .fposter:hover .pact{opacity:1}
@@ -179,6 +189,7 @@
     <h1>📸 <span>ShotBox</span></h1>
     <div class="stat" id="stat">загрузка…</div>
     <input type="search" id="q" placeholder="Поиск: название фильма, фраза, приложение…">
+    <button class="icon-btn" id="settingsBtn" title="Настройки">⚙</button>
   </div>
   <div class="tabs" id="tabs"></div>
 </header>
@@ -229,6 +240,32 @@
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none">Ничего не найдено</div>
 </main>
+
+<div class="modal" id="settingsModal">
+  <div class="sheet" style="max-width:420px;position:relative">
+    <button class="close" onclick="document.getElementById('settingsModal').classList.remove('open')">×</button>
+    <div class="side" style="flex:1 1 100%">
+      <h3>⚙ Настройки</h3>
+      <div>
+        <label>Текущий пароль</label>
+        <input type="password" id="pwOld" autocomplete="current-password">
+      </div>
+      <div>
+        <label>Новый пароль</label>
+        <input type="password" id="pwNew" autocomplete="new-password">
+      </div>
+      <div>
+        <label>Повторите новый пароль</label>
+        <input type="password" id="pwNew2" autocomplete="new-password">
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" onclick="changePassword()">Сменить пароль</button>
+        <a class="btn ghost" href="/logout" style="text-decoration:none;text-align:center">Выйти</a>
+      </div>
+      <div class="stat" id="pwMsg" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
 
 <div id="posterPop"><img id="posterPopImg" src="" alt=""></div>
 
@@ -288,6 +325,7 @@
         <button class="btn ghost" id="mFavBtn" onclick="favFromModal()" title="В избранное">☆ В избранное</button>
         <button class="btn ghost" onclick="refreshKp()" title="Перезапросить рейтинг/год/тип по названию">🔄 Кинопоиск</button>
         <a class="link" id="mOrig" target="_blank" style="align-self:center">Открыть оригинал ↗</a>
+        <button class="btn ghost" style="color:#ff7676;border-color:#4a2020" onclick="deleteItem(current.id)">🗑 Удалить</button>
       </div>
     </div>
   </div>
@@ -467,6 +505,51 @@ async function toggleFavorite(id){
   renderFilmsTable(); loadStats();
 }
 
+async function deleteItem(id){
+  const rec = current && current.id === id ? current : null;
+  if(!confirm("Удалить этот скриншот безвозвратно?
+
+Файл будет удалён и с сервера, и с NAS (Synology).")) return;
+  const r = await fetch(`/api/items/${id}?files=1&nas=1`, {method:"DELETE"});
+  if(r.ok){
+    closeModal();
+    loadStats(); load();
+    if(document.getElementById("filmsSection").style.display === "block") loadFilmsTable();
+  } else {
+    alert("Не удалось удалить");
+  }
+}
+
+function openSettings(){
+  document.getElementById("settingsModal").classList.add("open");
+  document.getElementById("pwMsg").textContent = "";
+}
+
+async function changePassword(){
+  const oldP = document.getElementById("pwOld").value;
+  const n1 = document.getElementById("pwNew").value;
+  const n2 = document.getElementById("pwNew2").value;
+  const msg = document.getElementById("pwMsg");
+  if(!n1 || n1 !== n2){ msg.textContent = "Новые пароли не совпадают"; msg.style.color="#ff7676"; return; }
+  const r = await fetch("/api/settings/password", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({old: oldP, new: n1})
+  });
+  const d = await r.json().catch(()=>({}));
+  if(r.ok){
+    msg.textContent = "✅ Пароль изменён. Войдите заново.";
+    msg.style.color = "#7ee0b8";
+    setTimeout(()=>location.href="/logout", 1500);
+  } else {
+    msg.textContent = "❌ " + (d.detail || "Ошибка");
+    msg.style.color = "#ff7676";
+  }
+}
+
+document.addEventListener("click", e=>{
+  if(e.target.id === "settingsBtn") openSettings();
+});
+
 async function deleteFilm(id){
   const rec = filmsData.find(x=>x.id===id);
   const title = rec ? rec.title : "";
@@ -563,6 +646,9 @@ async function load(){
     const txt = it.text || it.review || "";
     const d = (it.shot_date||"").slice(0,10);
     return `<div class="card" onclick='openItem(${JSON.stringify(it).replace(/'/g,"&#39;")})'>
+      <div class="cact">
+        <button class="del" title="Удалить скриншот" onclick="event.stopPropagation();deleteItem(${it.id})">🗑</button>
+      </div>
       <img class="thumb" loading="lazy" src="/thumbs/${it.thumb}" alt="">
       <div class="body">
         <div class="title">${esc(title)}</div>
