@@ -232,7 +232,7 @@ def films(subtype: str = "all"):
     elif subtype in ("фильм", "сериал", "мультфильм"):
         where.append(f"category = '{subtype}'")
     sql = """SELECT MIN(id) AS id, title, imdb, kp_rating, year, status, genre, text,
-                    MAX(watched) AS watched, MAX(favorite) AS favorite, thumb, rel_path, category, poster,
+                    MAX(watched) AS watched, MAX(favorite) AS favorite, MAX(needs_review) AS needs_review, thumb, rel_path, category, poster,
                     COUNT(*) AS copies
              FROM items
              WHERE {w}

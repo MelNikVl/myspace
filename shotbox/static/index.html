@@ -79,6 +79,7 @@
   .badge.cartoon{color:#ffb3e6;border-color:#4a1c3a;background:#220d1a}
   .badge.docs{color:#d6d6d6;border-color:#3a3a3a;background:#1a1a1a}
   .badge.psy{color:#c9a8ff;border-color:#3a2a4a;background:#1c1226}
+  .warn-b{font-size:12px;cursor:help}
   .badge.fun{color:#ffe066;border-color:#4a4220;background:#221e0d}
   /* таблица фильмов */
   .films-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
@@ -454,7 +455,8 @@ function renderFilmsTable(){
     const desc = (it.text||"").replace(/\s+/g," ").trim();
     return `<tr class="${it.watched?'watched':''}">
       <td class="fname" data-pid="${it.poster||''}" onclick='openById(${it.id})'>${esc(it.title||"Без названия")}
-        ${st?`<span class="st st-${it.status}">${st}</span>`:""}</td>
+        ${st?`<span class="st st-${it.status}">${st}</span>`:""}
+        ${it.needs_review?'<span class="warn-b" title="Название не подтверждено текстом — проверь">⚠️</span>':""}</td>
       <td>${typeBadge(it)}</td>
       <td class="fr">${it.imdb?("★ "+it.imdb):"—"}</td>
       <td class="fr" style="color:#ff9e4a">${it.kp_rating?it.kp_rating:"—"}</td>
