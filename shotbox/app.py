@@ -241,8 +241,14 @@ def films(subtype: str = "all"):
                     COUNT(*) AS copies
              FROM items
              WHERE {w}
-             GROUP BY LOWER(TRIM(COALESCE(NULLIF(title,''), 'id'||id)))
-             ORDER BY (MAX(favorite)=1) DESC, (MAX(watched)=1), (imdb IS NULL), imdb DESC, (year IS NULL), year DESC
+             GROUP BY CASE
+                        WHEN kp_id IS NOT NULL THEN 'kp' || kp_id
+                        WHEN TRIM(COALESCE(title,'')) != '' THEN 't:' || LOWER(TRIM(title))
+                        ELSE 'id' || id
+                      END
+             ORDER BY (MAX(favorite)=1) DESC, (MAX(watched)=1),
+                      (TRIM(COALESCE(MAX(title),'')) = ''),
+                      (MAX(imdb) IS NULL), MAX(imdb) DESC, (MAX(year) IS NULL), MAX(year) DESC
           """.format(w=" AND ".join(where))
     rows = [dict(r) for r in con.execute(sql)]
     con.close()

@@ -29,7 +29,8 @@ PROMPT = """Ты разбираешь ЛИЧНЫЕ скриншоты польз
 Верни СТРОГО JSON-МАССИВ из N объектов (по одному на каждое изображение, в том же порядке):
 [{"index": 1,
   "category": "<фильм|сериал|мультфильм|дизайн|олх|бизнес|книги|психология|медицина|визы|путешествия|китай|ремонт|питание|работа|документы|приколы|фраза|полезность|другое>",
-  "title": "<название ДОСЛОВНО из ТЕКСТА скрина, иначе null>",
+  "title": "<главное название ДОСЛОВНО из ТЕКСТА скрина, иначе null>",
+  "titles": ["<все названия фильмов/сериалов/книг, упомянутые в тексте скрина>"],
   "title_source": "<text|poster|none>",
   "evidence": "<фраза из текста, где есть название, до 120 символов>",
   "text": "<ключевой видимый текст скрина, до 200 символов>"},
@@ -41,6 +42,10 @@ PROMPT = """Ты разбираешь ЛИЧНЫЕ скриншоты польз
 3. Нет названия в тексте → title_source="none", title=null.
 4. Название видно только на постере → title_source="poster".
 5. evidence — дословная фраза из текста с названием.
+6. Если в тексте упомянуто НЕСКОЛЬКО фильмов/сериалов (например, подборка
+   «Топ-5 фильмов: X, Y, Z») — перечисли ВСЕ названия в массиве "titles"
+   (по одному элементу на фильм), а в "title" — первое/главное.
+   Это позволит создать отдельные записи для каждого фильма.
 
 Категории:
 - фильм / сериал / мультфильм: кино, трейлеры, «что за фильм», постеры
@@ -145,7 +150,7 @@ def call_batch(batch):
     return None
 
 
-def save(con, item_id, res):
+def save(con, item_id, res, row=None):
     cat = (res.get("category") or "другое")[:30]
     title = (res.get("title") or "").strip() if isinstance(res.get("title"), str) else ""
     src = (res.get("title_source") or "none").lower()
@@ -170,12 +175,35 @@ def save(con, item_id, res):
         (cat, title[:300], text, needs_review, item_id),
     )
 
+    # несколько фильмов на одном скрине → отдельные записи (тот же скрин)
+    extra = res.get("titles")
+    if cat in ("фильм", "сериал", "мультфильм") and isinstance(extra, list) and row:
+        seen_lower = {title.strip().lower()}
+        for t in extra:
+            if not isinstance(t, str):
+                continue
+            t = t.strip()[:300]
+            if len(t) < 2 or t.lower() in seen_lower:
+                continue
+            seen_lower.add(t.lower())
+            dup = con.execute(
+                "SELECT 1 FROM items WHERE rel_path=? AND LOWER(TRIM(COALESCE(title,''))) = ?",
+                (row["rel_path"], t.lower())).fetchone()
+            if dup:
+                continue
+            con.execute(
+                "INSERT INTO items (rel_path, thumb, title, category, text, analyzed, "
+                "content_hash, needs_review, app) VALUES (?,?,?,?,?,1,?,1,?)",
+                (row["rel_path"], row["thumb"], t, cat, text[:800],
+                 row["content_hash"], row["app"]))
+
 
 def main():
     con = sqlite3.connect(DB)
     con.row_factory = sqlite3.Row
-    rows = con.execute("SELECT id, rel_path FROM items WHERE analyzed=0").fetchall()
-    todo = [{"id": r["id"], "path": os.path.join(PHOTOS, r["rel_path"])} for r in rows
+    rows = con.execute("SELECT id, rel_path, thumb, content_hash, app FROM items WHERE analyzed=0").fetchall()
+    todo = [{"id": r["id"], "path": os.path.join(PHOTOS, r["rel_path"]),
+             "row": r} for r in rows
             if os.path.exists(os.path.join(PHOTOS, r["rel_path"]))]
     print(f"к обработке: {len(todo)} | батч: {BATCH} | запросов: ~{-(-len(todo)//BATCH)}", flush=True)
 
@@ -195,7 +223,7 @@ def main():
         for pos, it in enumerate(batch, 1):
             r = by_idx.get(pos)
             if r:
-                save(con, it["id"], r)
+                save(con, it["id"], r, it.get("row"))
         con.commit()
         done += len(batch)
         el = time.time() - t0

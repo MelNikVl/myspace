@@ -31,6 +31,9 @@ PY
 ./venv/bin/python fix_meta2.py >> /tmp/shotbox_enrich.log 2>&1
 
 # 5) постеры для новых kp_id
+./venv/bin/python fill_titles.py >> /tmp/shotbox_enrich.log 2>&1
+
+# 5) постеры для новых kp_id
 ./venv/bin/python fetch_posters.py >> /tmp/shotbox_enrich.log 2>&1
 
 echo "$(date '+%F %T') DONE" >> /tmp/shotbox_resume.log
