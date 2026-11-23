@@ -284,7 +284,6 @@
   <div class="sheet" style="position:relative">
     <button class="close" onclick="closeModal()">×</button>
     <div class="imgwrap"><img id="mImg" src=""></div>
-    <img id="mPoster" src="" style="display:none;width:200px;object-fit:contain;align-self:flex-start;margin:20px 0 0">
     <div class="side">
       <h3 id="mTitle">—</h3>
       <div class="stat" id="mMeta"></div>
@@ -318,27 +317,17 @@
         <label>Название / заголовок</label>
         <input type="text" id="mName" placeholder="Например: Дюна: Пророчество">
       </div>
+      <div id="mPosterWrap" style="display:none">
+        <img id="mPoster" src="" alt="" style="width:100%;max-width:230px;border-radius:12px;display:block">
+      </div>
       <div>
         <label>Текст / описание</label>
         <textarea id="mText" rows="4"></textarea>
-      </div>
-      <div>
-        <label>Мой отзыв</label>
-        <textarea id="mReview" rows="3" placeholder="Что понравилось, стоит ли смотреть…"></textarea>
-      </div>
-      <div>
-        <label>Оценка</label>
-        <div class="stars" id="mStars">
-          <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span>
-          <span class="star" data-v="3">★</span><span class="star" data-v="4">★</span>
-          <span class="star" data-v="5">★</span>
-        </div>
       </div>
       <div class="row" style="flex-wrap:wrap">
         <button class="btn" onclick="saveItem()">Сохранить</button>
         <button class="btn ghost" id="mFavBtn" onclick="favFromModal()" title="В избранное">☆ В избранное</button>
         <button class="btn ghost" onclick="refreshKp()" title="Перезапросить рейтинг/год/тип по названию">🔄 Кинопоиск</button>
-        <a class="link" id="mOrig" target="_blank" style="align-self:center">Открыть оригинал ↗</a>
         <button class="btn ghost" style="color:#ff7676;border-color:#4a2020" onclick="deleteItem(current.id)">🗑 Удалить</button>
       </div>
     </div>
@@ -715,12 +704,11 @@ function openItem(it){
   document.getElementById("mCat").value = it.category==="не разобрано" ? "другое" : it.category;
   document.getElementById("mName").value = it.title||"";
   document.getElementById("mText").value = it.text||"";
-  document.getElementById("mReview").value = it.review||"";
-  document.getElementById("mOrig").href = "/photos/" + it.rel_path;
 
   const mp = document.getElementById("mPoster");
-  if(it.poster){ mp.src = "/posters/" + it.poster; mp.style.display = "block"; }
-  else { mp.style.display = "none"; }
+  const mpw = document.getElementById("mPosterWrap");
+  if(it.poster){ mp.src = "/posters/" + it.poster; mpw.style.display = "block"; }
+  else { mp.src = ""; mpw.style.display = "none"; }
 
   const mf = document.getElementById("mFilm");
   if(["фильм","сериал","мультфильм"].includes(it.category)){
@@ -741,17 +729,9 @@ function openItem(it){
     mf.style.display = "none";
   }
 
-  paintStars(); paintFavBtn();
+  paintFavBtn();
   document.getElementById("modal").classList.add("open");
 }
-function paintStars(){
-  document.querySelectorAll("#mStars .star").forEach(s=>{
-    s.classList.toggle("on", +s.dataset.v <= rating);
-  });
-}
-document.getElementById("mStars").onclick = e=>{
-  if(e.target.dataset.v){ rating = +e.target.dataset.v; paintStars(); }
-};
 function closeModal(){document.getElementById("modal").classList.remove("open");}
 document.getElementById("modal").onclick = e=>{ if(e.target.id==="modal") closeModal(); };
 
@@ -843,7 +823,6 @@ async function saveItem(){
       category: document.getElementById("mCat").value,
       title: document.getElementById("mName").value,
       text: document.getElementById("mText").value,
-      review: document.getElementById("mReview").value,
       rating: rating
     })
   });
