@@ -235,7 +235,6 @@
         <th>Описание</th>
         <th>★</th>
         <th data-sort="watched">Смотрел</th>
-        <th>Скачать</th>
         <th></th>
       </tr></thead>
       <tbody id="filmsBody"></tbody>
@@ -388,7 +387,7 @@ async function loadProgress(){
 }
 setInterval(loadProgress, 15000);
 
-let filmsData = [], filmsSort = {key:"imdb", dir:-1}, filmsView = "table", filmSub = "all";
+let filmsData = [], filmsSort = {key:"imdb", dir:-1}, filmsView = "posters", filmSub = "all";
 
 function typeBadge(it){
   const map = { "фильм":["🎬 Фильм","film"], "сериал":["📺 Сериал","serial"],
@@ -400,14 +399,6 @@ function typeBadge(it){
 function cleanTitle(t){
   return (t||"").replace(/[«»"']/g,"").replace(/\s+/g," ").trim();
 }
-function torrentLinks(it){
-  const q = cleanTitle(it.title);
-  if(!q) return "—";
-  const e = encodeURIComponent(q);
-  return `<a class="tlink" target="_blank" rel="noopener" title="Скачать с RuTracker"
-            href="https://rutracker.org/forum/tracker.php?nm=${e}">🧲</a>`;
-}
-
 function stText(it){
   const st = {released:"Вышел", ongoing:"Идёт", upcoming:"Скоро"}[it.status] || "";
   return st;
@@ -449,9 +440,7 @@ function renderFilmsTable(){
         <img loading="lazy" src="/posters/${it.poster}" alt="">
         <div class="pb">
           <div class="pn">${esc(it.title||"Без названия")}</div>
-          <div class="fmeta">${it.imdb?`<span class="imdb">★ ${it.imdb}</span>`:""}${it.year?`<span>${it.year}</span>`:""}
-            <a class="tlink" style="margin-left:auto" target="_blank" rel="noopener" title="Скачать"
-               href="https://rutracker.org/forum/tracker.php?nm=${encodeURIComponent(cleanTitle(it.title))}">🧲</a></div>
+          <div class="fmeta">${it.imdb?`<span class="imdb">★ ${it.imdb}</span>`:""}${it.year?`<span>${it.year}</span>`:""}</div>
         </div>
       </div>`).join("") || `<div class="empty">Нет постеров</div>`;
   } else {
@@ -476,7 +465,6 @@ function renderFilmsTable(){
           onclick="event.stopPropagation();toggleFavorite(${it.id})">${it.favorite?"★":"☆"}</button></td>
       <td class="fwatch"><input type="checkbox" ${it.watched?"checked":""}
           onchange="toggleWatched(${it.id}, this.checked)"></td>
-      <td class="ftorr">${torrentLinks(it)}</td>
       <td><button class="del-btn" title="Удалить фильм и скрин" onclick="event.stopPropagation();deleteFilm(${it.id})">🗑</button></td>
     </tr>`;
   }).join("");
@@ -726,8 +714,6 @@ function openItem(it){
     if(st) bits.push(st);
     const q = encodeURIComponent(it.title || it.text || "");
     const tq = encodeURIComponent(cleanTitle(it.title));
-    bits.push(`<a class="link" target="_blank" rel="noopener" href="https://rutracker.org/forum/tracker.php?nm=${tq}">🧲 RuTracker</a>`);
-    bits.push(`<a class="link" target="_blank" rel="noopener" href="https://nnmclub.to/forum/tracker.php?nm=${tq}">🧲 NNM-Club</a>`);
     if(it.kp_id) bits.push(`<a class="link" target="_blank" href="https://www.kinopoisk.ru/film/${it.kp_id}/">🎬 Кинопоиск ↗</a>`);
     else bits.push(`<a class="link" target="_blank" href="https://www.kinopoisk.ru/index.php?kp_query=${q}">Кинопоиск ↗</a>`);
     mf.innerHTML = `<div class="fmeta">${bits.join("")}</div>`;
