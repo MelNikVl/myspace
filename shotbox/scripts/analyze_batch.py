@@ -11,7 +11,9 @@ from urllib.request import Request, urlopen
 
 from PIL import Image
 
-KEY = os.environ["GEMINI_KEY"]
+KEYS = [k for k in (os.environ.get("GEMINI_KEY"), os.environ.get("GEMINI_KEY_2")) if k]
+KEY = KEYS[0] if KEYS else ""
+KEY_IDX = 0
 MODELS = ["gemini-3.1-flash-lite", "gemini-3-flash-preview"]
 MODEL = MODELS[0]
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -81,6 +83,7 @@ def prep_image(path):
 
 def call_batch(batch):
     """batch: список dict(id, path). Возвращает список результатов или None."""
+    global KEY, KEY_IDX
     parts = [{"text": PROMPT + f"\n\nНа входе {len(batch)} изображений. Верни массив из {len(batch)} объектов."}]
     for i, it in enumerate(batch, 1):
         try:
@@ -120,7 +123,13 @@ def call_batch(batch):
             body = e.read().decode()
             if e.code == 429:
                 if "per day" in body:
-                    raise SystemExit("ДНЕВНАЯ КВОТА GEMINI ИСЧЕРПАНА")
+                    KEY_IDX += 1
+                    if KEY_IDX < len(KEYS):
+                        KEY = KEYS[KEY_IDX]
+                        print(f"  дневная квота ключа #{KEY_IDX} исчерпана → перехожу на ключ #{KEY_IDX+1}",
+                              flush=True)
+                        continue
+                    raise SystemExit("ВСЕ КЛЮЧИ GEMINI ИСЧЕРПАНЫ (дневная квота)")
                 m = re.search(r"retry in ([0-9.]+)s", body)
                 time.sleep(float(m.group(1)) + 2 if m else 16)
                 continue
