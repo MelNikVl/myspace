@@ -287,6 +287,9 @@
     <div class="side">
       <h3 id="mTitle">—</h3>
       <div class="stat" id="mMeta"></div>
+      <div id="mPosterWrap" style="display:none;margin:4px 0 8px">
+        <img id="mPoster" src="" alt="" style="width:150px;max-height:220px;object-fit:cover;border-radius:10px;display:block;border:1px solid #262b36">
+      </div>
       <div id="mFilm" style="display:none"></div>
       <div>
         <label>Категория</label>
@@ -316,9 +319,6 @@
       <div>
         <label>Название / заголовок</label>
         <input type="text" id="mName" placeholder="Например: Дюна: Пророчество">
-      </div>
-      <div id="mPosterWrap" style="display:none">
-        <img id="mPoster" src="" alt="" style="width:100%;max-width:230px;border-radius:12px;display:block">
       </div>
       <div>
         <label>Текст / описание</label>
@@ -596,9 +596,10 @@ async function toggleWatched(id, val){
 async function openById(id){
   const it = filmsData.find(x=>x.id===id);
   if(!it) return;
-  const full = await (await fetch("/api/items?q=&limit=500")).json();
-  const found = full.items.find(x=>x.id===id) || it;
-  openItem(found);
+  // список для листания стрелками — текущая под-вкладка фильмов
+  lastList = filmsData.slice();
+  kbIdx = lastList.findIndex(x=>x.id===id);
+  openItem(it);
 }
 
 document.addEventListener("click", e=>{
@@ -697,6 +698,7 @@ function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">"
 
 function openItem(it){
   current = it; rating = it.rating||0;
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
   document.getElementById("mImg").src = "/photos/" + it.rel_path;
   document.getElementById("mTitle").textContent = it.title || it.app || "—";
   document.getElementById("mMeta").textContent =
@@ -731,6 +733,7 @@ function openItem(it){
 
   paintFavBtn();
   document.getElementById("modal").classList.add("open");
+  document.body.focus();
 }
 function closeModal(){document.getElementById("modal").classList.remove("open");}
 document.getElementById("modal").onclick = e=>{ if(e.target.id==="modal") closeModal(); };
@@ -749,8 +752,10 @@ function openByIndex(i){
 
 document.addEventListener("keydown", e=>{
   const tag = (e.target.tagName || "").toLowerCase();
-  if(tag === "input" || tag === "textarea" || tag === "select") return;
   const modalOpen = document.getElementById("modal").classList.contains("open");
+  // в модалке стрелки листают всегда, кроме textarea (там нужен курсор)
+  if(modalOpen){ if(tag === "textarea") return; }
+  else if(tag === "input" || tag === "textarea" || tag === "select") return;
 
   if(e.key === "ArrowRight" || e.key === "ArrowLeft"){
     const step = (e.key === "ArrowRight") ? 1 : -1;
