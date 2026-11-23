@@ -670,19 +670,45 @@ async function loadStats(){
   }
 
   tabs.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
-    cat=t.dataset.k; history.replaceState(null,"","#"+encodeURIComponent(cat)); loadStats(); load();
+    cat = t.dataset.k;
+    history.replaceState(null, "", "#" + encodeURIComponent(cat));
     const fs = document.getElementById("filmsSection");
-    if(cat==="фильм"){ fs.style.display="block"; loadFilmsTable(); }
-    else fs.style.display="none";
+    const grid = document.getElementById("grid");
+    if(cat === "фильм"){
+      fs.style.display = "block";
+      grid.style.display = "none";
+      loadFilmsTable();
+    } else {
+      fs.style.display = "none";
+      grid.style.display = "";
+      load();
+    }
+    loadStats();
   });
 }
 
+let loadSeq = 0;
+
 async function load(){
-  const catParam = (cat === "путешествия" && tripFilter === "китай") ? "китай" : cat;
-  const r = await (await fetch(`/api/items?category=${encodeURIComponent(catParam)}&q=${encodeURIComponent(query)}`)).json();
-  lastList = r.items || [];
-  kbIdx = -1;
+  const seq = ++loadSeq;
   const grid = document.getElementById("grid");
+  const catParam = (cat === "путешествия" && tripFilter === "китай") ? "китай" : cat;
+  let r;
+  try{
+    const resp = await fetch(`/api/items?category=${encodeURIComponent(catParam)}&q=${encodeURIComponent(query)}`);
+    if(!resp.ok) throw new Error("HTTP " + resp.status);
+    r = await resp.json();
+  }catch(e){
+    if(seq === loadSeq){
+      grid.innerHTML = `<div class="empty">Не удалось загрузить (${e.message}).
+        <a href="#" onclick="load();return false" style="color:#4f8cff">Повторить</a></div>`;
+    }
+    return;
+  }
+  if(seq !== loadSeq) return;           // пришёл устаревший ответ — игнорируем
+  lastList = (r && r.items) || [];
+  kbIdx = -1;
+  if(!r || !r.items){ r = {items: []}; }
   document.getElementById("empty").style.display = r.items.length ? "none" : "block";
   grid.innerHTML = r.items.map(it=>{
     const b = BADGE[it.category] || "";
@@ -856,8 +882,14 @@ document.getElementById("q").oninput = e=>{
   window._t = setTimeout(()=>{query = e.target.value.trim(); load();}, 300);
 };
 
-loadStats(); load(); loadProgress();
-if(cat==="фильм"){ document.getElementById("filmsSection").style.display="block"; loadFilmsTable(); }
+loadStats(); loadProgress();
+if(cat === "фильм"){
+  document.getElementById("filmsSection").style.display = "block";
+  document.getElementById("grid").style.display = "none";
+  loadFilmsTable();
+} else {
+  load();
+}
 </script>
 </body>
 </html>
