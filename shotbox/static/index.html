@@ -53,6 +53,7 @@
   .st-unknown{color:var(--muted);border-color:var(--line);background:var(--card2)}
   main{padding:20px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+  .card.kb-focus{outline:2px solid #4f8cff;outline-offset:2px}
   .card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;
         overflow:hidden;cursor:pointer;transition:.18s;display:flex;flex-direction:column}
   .card:hover{transform:translateY(-3px);border-color:#3a4356;
@@ -243,7 +244,11 @@
     <div class="empty" id="filmsEmpty" style="display:none">Пока нет распознанных фильмов</div>
     <h3 class="scans-title">Скрины</h3>
   </section>
-  <div class="grid" id="grid"></div>
+  <div class="subtabs" id="tripSub" style="display:none;margin:0 0 14px">
+  <div class="stab active" data-trip="all">✈️ Все<span class="n" id="tripAllN">0</span></div>
+  <div class="stab" data-trip="китай">🇨🇳 Китай<span class="n" id="tripCnN">0</span></div>
+</div>
+<div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none">Ничего не найдено</div>
 </main>
 
@@ -344,13 +349,13 @@
 const CATS = [
   ["all","Всё"],["фильм","🎬 Фильмы"],["дизайн","🎨 Дизайн"],["олх","🛒 OLX"],
   ["бизнес","💼 Бизнес"],["книги","📚 Книги"],["психология","🧠 Психология"],["медицина","🏥 Медицина"],
-  ["визы","🛂 Визы и переезд"],["путешествия","✈️ Путешествия"],["китай","🇨🇳 Китай"],["работа","💼 Работа"],
+  ["визы","🛂 Визы и переезд"],["путешествия","✈️ Путешествия"],["работа","💼 Работа"],
   ["документы","📄 Документы"],["приколы","😂 Приколы"],["ремонт","🔨 Ремонт"],["питание","🍎 Питание"],["фраза","💬 Фразы"],["полезность","🛠 Полезности"],
   ["другое","📦 Прочее"]
 ];
 const BADGE = {фильм:"film", сериал:"serial", дизайн:"design", олх:"olx", фраза:"phrase", полезность:"useful", бизнес:"business", книги:"books", психология:"psy", медицина:"med", визы:"visa", путешествия:"travel", работа:"work", мультфильм:"cartoon", документы:"docs", приколы:"fun", китай:"china", ремонт:"repair", питание:"food"};
 const ST_LABEL = {released:"Вышел", ongoing:"Идёт", upcoming:"Скоро", unknown:""};
-let cat = "all", query = "", current = null, rating = 0;
+let cat = "all", query = "", current = null, rating = 0, tripFilter = "all", lastList = [], kbIdx = -1;
 // поддержка прямых ссылок: #фильм, #олх и т.д.
 (function(){
   const h = decodeURIComponent(location.hash.slice(1));
@@ -654,6 +659,17 @@ async function loadStats(){
     const n = k==="all" ? s.total : (k==="другое" ? Math.max(s.total-known,0) : (s.categories[k]||0));
     return `<div class="tab ${k===cat?'active':''}" data-k="${k}">${label}<span class="n">${n}</span></div>`;
   }).join("");
+  const ts = document.getElementById("tripSub");
+  if(ts){
+    ts.style.display = (cat === "путешествия") ? "flex" : "none";
+    ts.querySelectorAll(".stab").forEach(b=>{
+      b.classList.toggle("active", b.dataset.trip === tripFilter);
+      b.onclick = ()=>{ tripFilter = b.dataset.trip; loadStats(); load(); };
+    });
+    if(el("tripAllN")) el("tripAllN").textContent = (c["путешествия"]||0) + (c["китай"]||0);
+    if(el("tripCnN")) el("tripCnN").textContent = c["китай"]||0;
+  }
+
   tabs.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
     cat=t.dataset.k; history.replaceState(null,"","#"+encodeURIComponent(cat)); loadStats(); load();
     const fs = document.getElementById("filmsSection");
@@ -663,7 +679,10 @@ async function loadStats(){
 }
 
 async function load(){
-  const r = await (await fetch(`/api/items?category=${encodeURIComponent(cat)}&q=${encodeURIComponent(query)}`)).json();
+  const catParam = (cat === "путешествия" && tripFilter === "китай") ? "китай" : cat;
+  const r = await (await fetch(`/api/items?category=${encodeURIComponent(catParam)}&q=${encodeURIComponent(query)}`)).json();
+  lastList = r.items || [];
+  kbIdx = -1;
   const grid = document.getElementById("grid");
   document.getElementById("empty").style.display = r.items.length ? "none" : "block";
   grid.innerHTML = r.items.map(it=>{
@@ -735,6 +754,42 @@ document.getElementById("mStars").onclick = e=>{
 };
 function closeModal(){document.getElementById("modal").classList.remove("open");}
 document.getElementById("modal").onclick = e=>{ if(e.target.id==="modal") closeModal(); };
+
+// ── листание стрелками ──
+function openByIndex(i){
+  if(!lastList.length) return;
+  kbIdx = Math.max(0, Math.min(lastList.length - 1, i));
+  const cards = document.querySelectorAll("#grid .card");
+  cards.forEach(c=>c.classList.remove("kb-focus"));
+  if(cards[kbIdx]){
+    cards[kbIdx].classList.add("kb-focus");
+    cards[kbIdx].scrollIntoView({block:"nearest", behavior:"smooth"});
+  }
+}
+
+document.addEventListener("keydown", e=>{
+  const tag = (e.target.tagName || "").toLowerCase();
+  if(tag === "input" || tag === "textarea" || tag === "select") return;
+  const modalOpen = document.getElementById("modal").classList.contains("open");
+
+  if(e.key === "ArrowRight" || e.key === "ArrowLeft"){
+    const step = (e.key === "ArrowRight") ? 1 : -1;
+    if(modalOpen){
+      if(!current) return;
+      const i = lastList.findIndex(x=>x.id === current.id);
+      if(i < 0) return;
+      const next = i + step;
+      if(next >= 0 && next < lastList.length){ e.preventDefault(); openItem(lastList[next]); }
+    } else {
+      e.preventDefault();
+      openByIndex(kbIdx < 0 ? (step > 0 ? 0 : lastList.length - 1) : kbIdx + step);
+    }
+  }
+  if(e.key === "Enter" && !modalOpen && kbIdx >= 0 && lastList[kbIdx]){
+    openItem(lastList[kbIdx]);
+  }
+  if(e.key === "Escape" && modalOpen) closeModal();
+});
 
 async function favFromModal(){
   if(!current) return;

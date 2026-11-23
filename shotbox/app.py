@@ -29,7 +29,6 @@ CATEGORIES = [
     ("медицина", "🏥 Медицина"),
     ("визы", "🛂 Визы и переезд"),
     ("путешествия", "✈️ Путешествия"),
-    ("китай", "🇨🇳 Китай"),
     ("работа", "💼 Работа"),
     ("документы", "📄 Документы"),
     ("приколы", "😂 Приколы"),
@@ -202,6 +201,8 @@ def items(category: str = "all", q: str = "", limit: int = 500, offset: int = 0,
     if category and category != "all":
         if category == "фильм":
             where.append("category IN ('фильм','сериал','мультфильм')")
+        elif category == "путешествия":
+            where.append("category IN ('путешествия','китай')")
         elif category == "другое":
             where.append(f"category NOT IN {KNOWN}")
         else:
