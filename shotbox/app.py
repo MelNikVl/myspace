@@ -136,7 +136,7 @@ def delete_on_nas(rel_path: str) -> bool:
         return False
 
 
-PUBLIC_PATHS = ("/login", "/favicon.ico", "/health")
+PUBLIC_PATHS = ("/login", "/favicon.ico", "/favicon.png", "/health")
 
 
 @app.middleware("http")
@@ -427,6 +427,16 @@ async def change_password(request: Request):
 @app.get("/api/settings")
 def settings_info():
     return {"login": get_setting("admin_login", "admin")}
+
+
+@app.get("/favicon.ico")
+def favicon_ico():
+    return FileResponse(os.path.join(BASE, "static", "favicon.ico"), media_type="image/x-icon")
+
+
+@app.get("/favicon.png")
+def favicon_png():
+    return FileResponse(os.path.join(BASE, "static", "favicon.png"), media_type="image/png")
 
 
 @app.get("/health")

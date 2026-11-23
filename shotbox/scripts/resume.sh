@@ -1,13 +1,13 @@
 #!/bin/bash
-# ShotBox: перепрогон фильмов + метаданные. Запускается по крону (13:05 / 19:05).
+# ShotBox: перепрогон фильмов + метаданные (батчинг + ресайз).
 cd /home/nik/shotbox || exit 1
 set -a
 source ./.env
 set +a
 
-echo "$(date '+%F %T) START" >> /tmp/shotbox_resume.log
+echo "$(date '+%F %T') START" >> /tmp/shotbox_resume.log
 
-# 1) сброс фильмов без ручных правок (перепрогон с улучшенным промптом)
+# 1) сброс фильмов без ручных правок (перепрогон с новой логикой названий)
 ./venv/bin/python - <<'PY' >> /tmp/shotbox_resume.log 2>&1
 import sqlite3
 con = sqlite3.connect("data/shotbox.db")
@@ -21,10 +21,10 @@ print("сброшено на перепрогон:", n)
 con.close()
 PY
 
-# 2) классификация (Gemini)
-./venv/bin/python analyze_all.py >> /tmp/shotbox_analyze.log 2>&1
+# 2) классификация батчами по 6 (ресайз 1024px) — в ~6 раз меньше запросов
+./venv/bin/python analyze_batch.py >> /tmp/shotbox_analyze.log 2>&1
 
-# 3) тип/год/жанр/рейтинги из Кинопоиска (fuzzy-поиск)
+# 3) метаданные из Кинопоиска (fuzzy-поиск, порог 55%)
 ./venv/bin/python enrich_kp.py >> /tmp/shotbox_enrich.log 2>&1
 
 # 4) дозаполнение IMDb через OMDB
