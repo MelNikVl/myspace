@@ -83,6 +83,9 @@
   .badge.docs{color:#d6d6d6;border-color:#3a3a3a;background:#1a1a1a}
   .badge.psy{color:#c9a8ff;border-color:#3a2a4a;background:#1c1226}
   .warn-b{font-size:12px;cursor:help}
+  .badge.china{color:#ff9e9e;border-color:#4a2020;background:#220d0d}
+  .badge.repair{color:#ffc48f;border-color:#4a3520;background:#221a0d}
+  .badge.food{color:#a8e6a8;border-color:#204a20;background:#0d220d}
   .badge.fun{color:#ffe066;border-color:#4a4220;background:#221e0d}
   /* таблица фильмов */
   .films-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
@@ -298,6 +301,9 @@
           <option value="работа">💼 Работа</option>
           <option value="документы">📄 Документы</option>
           <option value="приколы">😂 Приколы</option>
+          <option value="китай">🇨🇳 Китай</option>
+          <option value="ремонт">🔨 Ремонт</option>
+          <option value="питание">🍎 Питание</option>
           <option value="мультфильм">🧸 Мультфильм</option>
           <option value="фраза">💬 Фраза</option>
           <option value="полезность">🛠 Полезность</option>
@@ -339,11 +345,11 @@
 const CATS = [
   ["all","Всё"],["фильм","🎬 Фильмы"],["дизайн","🎨 Дизайн"],["олх","🛒 OLX"],
   ["бизнес","💼 Бизнес"],["книги","📚 Книги"],["психология","🧠 Психология"],["медицина","🏥 Медицина"],
-  ["визы","🛂 Визы и переезд"],["путешествия","✈️ Путешествия"],["работа","💼 Работа"],
-  ["документы","📄 Документы"],["приколы","😂 Приколы"],["фраза","💬 Фразы"],["полезность","🛠 Полезности"],
+  ["визы","🛂 Визы и переезд"],["путешествия","✈️ Путешествия"],["китай","🇨🇳 Китай"],["работа","💼 Работа"],
+  ["документы","📄 Документы"],["приколы","😂 Приколы"],["ремонт","🔨 Ремонт"],["питание","🍎 Питание"],["фраза","💬 Фразы"],["полезность","🛠 Полезности"],
   ["другое","📦 Прочее"]
 ];
-const BADGE = {фильм:"film", сериал:"serial", дизайн:"design", олх:"olx", фраза:"phrase", полезность:"useful", бизнес:"business", книги:"books", психология:"psy", медицина:"med", визы:"visa", путешествия:"travel", работа:"work", мультфильм:"cartoon", документы:"docs", приколы:"fun"};
+const BADGE = {фильм:"film", сериал:"serial", дизайн:"design", олх:"olx", фраза:"phrase", полезность:"useful", бизнес:"business", книги:"books", психология:"psy", медицина:"med", визы:"visa", путешествия:"travel", работа:"work", мультфильм:"cartoon", документы:"docs", приколы:"fun", китай:"china", ремонт:"repair", питание:"food"};
 const ST_LABEL = {released:"Вышел", ongoing:"Идёт", upcoming:"Скоро", unknown:""};
 let cat = "all", query = "", current = null, rating = 0;
 // поддержка прямых ссылок: #фильм, #олх и т.д.
@@ -510,7 +516,36 @@ async function toggleFavorite(id){
   renderFilmsTable(); loadStats();
 }
 
+function filterByApp(app){
+  cat = "all";
+  query = app || "";
+  document.getElementById("q").value = query;
+  history.replaceState(null,"","#all");
+  loadStats(); load();
+}
+
 async function deleteItem(id){
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if(card) card.style.opacity = ".35";
+  if(!confirm("Удалить этот скриншот безвозвратно?\n\nФайл будет удалён и с сервера, и с NAS (Synology).")){
+    if(card) card.style.opacity = "";
+    return;
+  }
+  try{
+    const r = await fetch(`/api/items/${id}?files=1&nas=1`, {method:"DELETE"});
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    if(card) card.remove();
+    if(current && current.id === id) closeModal();
+    await loadStats();
+    // если осталось мало — перечитываем список (без ожидания картинок)
+    if(!document.querySelectorAll("#grid .card").length) await load();
+  }catch(e){
+    if(card) card.style.opacity = "";
+    alert("Не удалось удалить: " + e.message);
+  }
+}
+
+async function deleteItemOld(id){
   const rec = current && current.id === id ? current : null;
   if(!confirm("Удалить этот скриншот безвозвратно?\n\nФайл будет удалён и с сервера, и с NAS (Synology).")) return;
   const r = await fetch(`/api/items/${id}?files=1&nas=1`, {method:"DELETE"});
@@ -648,7 +683,7 @@ async function load(){
     const title = it.title || it.app || "Без названия";
     const txt = it.text || it.review || "";
     const d = (it.shot_date||"").slice(0,10);
-    return `<div class="card" onclick='openItem(${JSON.stringify(it).replace(/'/g,"&#39;")})'>
+    return `<div class="card" data-id="${it.id}" onclick='openItem(${JSON.stringify(it).replace(/'/g,"&#39;")})'>
       <div class="cact">
         <button class="del" title="Удалить скриншот" onclick="event.stopPropagation();deleteItem(${it.id})">🗑</button>
       </div>
